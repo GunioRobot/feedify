@@ -1,10 +1,14 @@
 require "rubygems"
+require "uri"
 require "open-uri"
 require "nokogiri"
 require "set"
 
 module Feedify
-  class BloggerError < Exception
+  class FeedifyError < Exception
+  end
+  
+  class BloggerError < FeedifyError
     attr_accessor :html
     def initialize(html)
       super("Something went wrong with our blogger html parsing")
@@ -12,7 +16,7 @@ module Feedify
     end
   end
 
-  class UnrecognisedMimeType < Exception
+  class UnrecognisedMimeType < FeedifyError
     attr_accessor :mime, :url
 
     def initialize(mime, url)
@@ -21,33 +25,44 @@ module Feedify
     end
   end
 
-  class NoFeedException < Exception
+  class NoFeed < FeedifyError
     def initialize(url)
       super("As best as we can determine there is no feed for #{url}")
     end
   end
 
-  class Loop < Exception
+  class Loop < FeedifyError
     def initialize(urls)
       super("After traversing #{urls.join(" -> ")} -> #{urls[0]} we seem to be back where we started")
     end
   end
 
+  class BadScheme < FeedifyError 
+    def initialize(scheme)
+      super("Feedify only deals with http. Why are you giving me a #{scheme} URI?")
+    end
+  end
+
   class Context
-    def initialize
-      @urls = Set.new
+    attr_accessor :base_uri
+
+    def initialize(url)
+      @base_uri = URI.parse(url)
+      @urls = []
     end
 
     def visit(url)
       if @urls.include?(url)
-        raise Loop.new(@urls.to_a)
+        raise Loop.new(@urls)
       else
-        @urls.add(url)
+        @urls << url
       end
     end
   end
 
-  def feed_for_url(url, context=Context.new)
+  def feed_for_url(url, context=Context.new(fix_url(url)))
+    return nil unless url
+    url = fix_url(url)
     file = open(url)
     location = file.meta["Location"]
     # TODO: Loop detection
@@ -56,23 +71,24 @@ module Feedify
     elsif file.content_type =~ /atom|rss|xml/
       url
     elsif file.content_type =~ /html/
-      feed_for_html(file.read, context)
+      feed_for_url(feed_for_html(file.read, context), context)
     else
       raise UnrecognisedMimeType.new(url, feed.content_type)
-    end or raise NoFeedException.new(url)
+    end or raise NoFeed.new(url)
   end
 
-  def feed_for_html(html, context=Context.new)
+  private 
+  def feed_for_html(html, context)
     feed_for_parse(Nokogiri::HTML(html), context)
   end
 
-  def feed_for_parse(html, context=Context.new)
+  def feed_for_parse(html, context)
     feed_from_alternative_links(html, context) ||
     feed_for_blogger_redirect(html, context) ||
     feed_from_in_page_hrefs(html, context) 
   end
 
-  def feed_from_alternative_links(html, context=Context.new)
+  def feed_from_alternative_links(html, context)
     links = html.xpath('//link[@rel="alternate"]').select{|x| x["type"] =~ /atom|rss/}
 
     if links.empty?
@@ -97,7 +113,7 @@ module Feedify
     links.map{|l| l["href"]}.uniq[0] 
   end
 
-  def feed_for_blogger_redirect(html, context=Context.new)
+  def feed_for_blogger_redirect(html, context)
     title = html.xpath("//title").text.strip
     # Blogger sometimes shows a useless redirect page which gives you 
     # no actual helpful information. Blogger blogs are popular enoguh
@@ -113,7 +129,7 @@ module Feedify
     end  
   end
 
-  def feed_from_in_page_hrefs(html)
+  def feed_from_in_page_hrefs(html, context)
     candidates = (html.xpath('//a') + html.xpath('//img[@href]')).select{|i| quick_and_dirty_url_filter(i['href'])}
 
     return if candidates.empty?
@@ -122,9 +138,9 @@ module Feedify
 
     candidates = selective if !selective.empty?
 
-    candidates = candidates.map{|x| x["href"]}.compact.uniq
+    candidates = candidates.map{|x| x["href"]}.compact.uniq.map{|x| (context.base_uri + URI.parse(x)).to_s}
 
-    nil
+    candidates[0] 
   end
 
   # A very quick pass over URLs to determine if it's at all possible that they
@@ -132,6 +148,16 @@ module Feedify
   # a feed URL but will often return true for non feed URLs.
   def quick_and_dirty_url_filter(url)
     url && (url !~ /\.(css|js|htm(l?)|jpg|gif|zip|jnlp)$/) && (url !~ /^#/)
+  end
+
+  def fix_url(url)
+    url = url.strip
+    scheme = URI.parse(url).scheme
+    case scheme 
+      when nil: "http://#{url.strip.gsub(/^\/*/, "")}"
+      when "http": url
+      else raise BadScheme.new(scheme) 
+    end    
   end
 
 end
