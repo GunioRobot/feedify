@@ -11,11 +11,23 @@ def run_tests
 
     from, to = line.split
 
-    puts "testing that #{from} maps to #{to}"
- 
-    if (actual = Feedify.feed_for_url(from)) != to.strip
-      failing += 1
-      puts "  ...but it actually maps to #{actual}"
+    to = to.strip
+
+    if to == "none"
+      puts "testing that #{from} has no feed"
+      begin 
+        actual = Feedify.feed_for_url(from) 
+        failing += 1
+        puts "  ...but it actually maps to #{actual}"
+      rescue Feedify::FeedifyError
+      end
+    else
+      puts "testing that #{from} maps to #{to}"
+   
+      if (actual = Feedify.feed_for_url(from)) != to
+        failing += 1
+        puts "  ...but it actually maps to #{actual}"
+      end
     end
   }
   failing

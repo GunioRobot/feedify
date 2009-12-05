@@ -43,6 +43,12 @@ module Feedify
     end
   end
 
+  class Confused < FeedifyError
+    def initialize(urls)
+      super("I'm sorry, I found all these URLs and didn't know how to decide between them: #{urls.join(", ")}")
+    end
+  end
+
   class Context
     attr_accessor :base_uri
 
@@ -88,16 +94,21 @@ module Feedify
     feed_from_in_page_hrefs(html, context) 
   end
 
-  def feed_from_alternative_links(html, context)
-    links = html.xpath('//link[@rel="alternate"]').select{|x| x["type"] =~ /atom|rss/}
+  def prune_elements(links)
+    links = links.select{|x| quick_and_dirty_url_filter(x["href"])}
 
-    if links.empty?
-      return
-    end
-    
+    selective = links.select{|x| x.to_s =~ /(atom|feed|rss)\b/}
+    links = selective if !selective.empty?
+
     if links.length > 1
       # prefer atom over rss due to snobbery
-      atom_only = links.select{|x| x["type"] =~ /atom/}
+      atom_only = links.select{|x| 
+        if x["type"]
+          x["type"] =~ /\batom\b/
+        else
+          x.to_s =~ /\batom\b/
+        end
+      }
       links = atom_only unless atom_only.empty?
   
       if links.length > 1 
@@ -107,9 +118,19 @@ module Feedify
         links = no_comments unless no_comments.empty?
       end
     end
-    
+    links
+  end
+
+  def feed_from_alternative_links(html, context)
+    links = html.xpath('//link[@rel="alternate"]').select{|x| x["type"] =~ /atom|rss/}
+
+    if links.empty?
+      return
+    end
+
+    links = prune_elements(links)
     # Hopefully we've got only one link here, modulo duplicate URLS
-    # If not, we give up and guess
+    # If not, we give up and guess. They're probably all ok.
     links.map{|l| l["href"]}.uniq[0] 
   end
 
@@ -130,16 +151,14 @@ module Feedify
   end
 
   def feed_from_in_page_hrefs(html, context)
-    candidates = (html.xpath('//a') + html.xpath('//img[@href]')).select{|i| quick_and_dirty_url_filter(i['href'])}
+    candidates = prune_elements(html.xpath('//a') + html.xpath('//img[@href]'))
 
     return if candidates.empty?
 
-    selective = candidates.select{|x| x.to_s =~ /(atom|feed|rss)\b/}
-
-    candidates = selective if !selective.empty?
-
     candidates = candidates.map{|x| x["href"]}.compact.uniq.map{|x| (context.base_uri + URI.parse(x)).to_s}
 
+    raise Confused.new(candidates) if candidates.length > 1 
+    
     candidates[0] 
   end
 
