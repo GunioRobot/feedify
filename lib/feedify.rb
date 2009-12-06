@@ -92,7 +92,10 @@ module Feedify
       elsif valid_content_type?(file.content_type)
         url
       elsif file.content_type =~ /html/
-        feed_for_url(feed_for_html(file.read, context), context)
+        discovered = feed_for_html(file.read, context)
+        if discovered
+          feed_for_url((URI.parse(url) + URI.parse(discovered)).to_s, context)
+        end
       else
         raise UnrecognisedMimeType.new(url, feed.content_type)
       end or raise NoFeed.new(url)
