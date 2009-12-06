@@ -64,7 +64,7 @@ module Feedify
     end
 
     def visit(url)
-      if @urls.include?(url)
+      if @urls[0..-2].include?(url)
         @urls << url
         raise Loop.new(@urls)
       else
@@ -84,15 +84,15 @@ module Feedify
       url = fix_url(url)
       context ||= Context.new(url)
       context.visit(url)
-      p url
       file = open(url)
-      location = file.meta["Location"]
+      location = file.base_uri.to_s
+      
       if location && (location != url)
         feed_for_url(location, context)
-      elsif file.content_type =~ /atom|rss|xml/
+      elsif valid_content_type?(file.content_type)
         url
       elsif file.content_type =~ /html/
-        feed_for_html(file.read, context)
+        feed_for_url(feed_for_html(file.read, context), context)
       else
         raise UnrecognisedMimeType.new(url, feed.content_type)
       end or raise NoFeed.new(url)
@@ -104,7 +104,6 @@ module Feedify
     end
   end
 
-  private 
   def feed_for_html(html, context)
     feed_for_parse(Nokogiri::HTML(html), context)
   end
@@ -171,6 +170,8 @@ module Feedify
     end  
   end
 
+  SMALL_NUMBER_OF_LINKS = 5
+
   def feed_from_in_page_hrefs(html, context)
     candidates = prune_elements(html.xpath('//a') + html.xpath('//img[@href]'))
 
@@ -178,9 +179,32 @@ module Feedify
 
     candidates = candidates.map{|x| x["href"]}.compact.uniq.map{|x| (context.base_uri + URI.parse(x)).to_s}
 
-    raise Confused.new(candidates) if candidates.length > 1 
+    raise Confused.new(candidates) if candidates.length > SMALL_NUMBER_OF_LINKS 
     
+    # We've only got a few possibilities, so let's just check them and find out if they look like feeds!
+    candidates = candidates.select{|x| is_a_feed?(x)}
+ 
+    raise Confused.new(candidates) if candidates.length > 1
+
     candidates[0] 
+  end
+
+  # Expensive test for feedhood. Has to fetch the URL
+  def is_a_feed?(url)
+    it = begin
+      open(url)    
+    rescue OpenURI::HTTPError
+      return false
+    end
+
+    return false if !valid_content_type?(it.content_type)
+    return false unless it.read =~ /<channel|feed[^>]*?>/ # Why yes, this is a hack. Why do you ask?
+
+    true
+  end
+
+  def valid_content_type?(type)
+    type =~ /atom|rss|xml/
   end
 
   # A very quick pass over URLs to determine if it's at all possible that they
