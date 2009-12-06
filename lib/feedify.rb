@@ -216,6 +216,9 @@ module Feedify
 
   def fix_url(url)
     url = url.strip
+
+    url = url.gsub(/^feed:/, "http:")
+
     scheme = URI.parse(url).scheme
     case scheme 
       when nil: "http://#{url.strip.gsub(/^\/*/, "")}"
