@@ -13,13 +13,16 @@ def run_tests
 
     to = to.strip
 
-    if to == "none"
-      puts "testing that #{from} has no feed"
+    if to =~ /^[[:alnum:]]+$/
+      puts "testing that #{from} has no feed and throws a #{to}"
       begin 
         actual = Feedify.feed_for_url(from) 
         failing += 1
         puts "  ...but it actually maps to #{actual}"
-      rescue Feedify::FeedifyError
+      rescue Feedify::FeedifyError => e
+        unless e.class.to_s == "Feedify::#{to}"
+          puts " ...but it actually throws a #{e.class}"
+        end
       end
     else
       puts "testing that #{from} maps to #{to}"
