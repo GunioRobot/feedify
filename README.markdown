@@ -19,5 +19,6 @@ So, if you find a URL that this doesn't handle correctly, please file an issue. 
 ## HTTP interface
 
 If you want to use this with something that's not ruby, there's an experimental sinatra based http interface to the API.
-It's currently pretty basic: Little more than a proof of concept. I may build a service out of it at some point, or if you want to
-take it and run with it I'm fine with that too.
+It's currently pretty basic: Little more than a proof of concept, and liable to change.
+
+A canonical version of this service is available at http://feedify.merobe.com/, but it's exactly what's in the repo so the only reason to use this is if you don't want to host it yourself.
