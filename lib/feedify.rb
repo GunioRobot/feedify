@@ -66,6 +66,10 @@ module Feedify
     end
   end
 
+  # Takes a url as a string, returns a URL of a feed for it as a string 
+  # or throws an exception. 
+  # Returns nil if you pass it nil, but given a non-nil URL it will always
+  # return a non-nil feed url or throw an exception.
   def feed_for_url(url, context=Context.new(fix_url(url)))
     return nil unless url
     url = fix_url(url)
