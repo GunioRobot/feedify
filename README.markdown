@@ -2,7 +2,7 @@
 
 Feedify is a library with exactly one purpose: Given a URL, determine the location of a feed for that URL if one exists.
 
-You laugh, I can hear you. "Surely that's an easy task" you say. "Just look up the <link>" elements in the html".
+You laugh, I can hear you. "Surely that's an easy task" you say. "Just look up the &lt;link&gt;" elements in the html".
 
 Yes, that's what I thought too. But the web is a scary place filled with idiots who redirect you using a status code of 200 and a helpful html page.
 
