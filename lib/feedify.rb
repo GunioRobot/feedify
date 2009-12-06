@@ -33,7 +33,7 @@ module Feedify
 
   class Loop < FeedifyError
     def initialize(urls)
-      super("After traversing #{urls.join(" -> ")} -> #{urls[0]} we seem to be back where we started")
+      super("After traversing #{urls.join(" -> ")} we seem to have hit a loop")
     end
   end
 
@@ -59,6 +59,7 @@ module Feedify
 
     def visit(url)
       if @urls.include?(url)
+        @urls << url
         raise Loop.new(@urls)
       else
         @urls << url
@@ -70,9 +71,12 @@ module Feedify
   # or throws an exception. 
   # Returns nil if you pass it nil, but given a non-nil URL it will always
   # return a non-nil feed url or throw an exception.
-  def feed_for_url(url, context=Context.new(fix_url(url)))
+  def feed_for_url(url, context=nil)    
     return nil unless url
     url = fix_url(url)
+    p url
+    context ||= Context.new(url)
+    context.visit(url)
     file = open(url)
     location = file.meta["Location"]
     # TODO: Loop detection
@@ -81,7 +85,7 @@ module Feedify
     elsif file.content_type =~ /atom|rss|xml/
       url
     elsif file.content_type =~ /html/
-      feed_for_url(feed_for_html(file.read, context), context)
+      feed_for_html(file.read, context)
     else
       raise UnrecognisedMimeType.new(url, feed.content_type)
     end or raise NoFeed.new(url)
