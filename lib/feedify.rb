@@ -49,6 +49,12 @@ module Feedify
     end
   end
 
+  class MissingPage < FeedifyError
+    def initialize(url)
+      super("Something pointed me at the URL #{url} but it wasn't there")
+    end
+  end
+
   class Context
     attr_accessor :base_uri
 
@@ -73,22 +79,29 @@ module Feedify
   # return a non-nil feed url or throw an exception.
   def feed_for_url(url, context=nil)    
     return nil unless url
-    url = fix_url(url)
-    p url
-    context ||= Context.new(url)
-    context.visit(url)
-    file = open(url)
-    location = file.meta["Location"]
-    # TODO: Loop detection
-    if location && (location != url)
-      feed_for_url(location, context)
-    elsif file.content_type =~ /atom|rss|xml/
-      url
-    elsif file.content_type =~ /html/
-      feed_for_html(file.read, context)
-    else
-      raise UnrecognisedMimeType.new(url, feed.content_type)
-    end or raise NoFeed.new(url)
+
+    begin 
+      url = fix_url(url)
+      context ||= Context.new(url)
+      context.visit(url)
+      p url
+      file = open(url)
+      location = file.meta["Location"]
+      if location && (location != url)
+        feed_for_url(location, context)
+      elsif file.content_type =~ /atom|rss|xml/
+        url
+      elsif file.content_type =~ /html/
+        feed_for_html(file.read, context)
+      else
+        raise UnrecognisedMimeType.new(url, feed.content_type)
+      end or raise NoFeed.new(url)
+    rescue SocketError
+      if $!.message == "getaddrinfo: Name or service not known"
+        raise MissingPage.new(url)
+      else raise
+      end
+    end
   end
 
   private 
