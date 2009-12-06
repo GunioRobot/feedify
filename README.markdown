@@ -14,4 +14,10 @@ Feedify attempts to deal with as many of these misbehaviours as it can, so that 
 
 It's almost certainly far from perfect. I've special cased a lot of behaviours based on blogs I read that I knew had weird behaviour: e.g. there's an entire chunk of code just for dealing with blogger's stupid redirect pages. I'm sure more special cases are possible, but I don't know about them. 
 
-So, if you find a URL that this doesn't handle correctly, please file an issue. Better yet: fork it, fix it and send me a pull request! But reports are enough if you don't want to do it yourself. 
+So, if you find a URL that this doesn't handle correctly, please file an issue. Better yet: fork it, fix it and send me a pull request! But reports are enough if you don't want to do it yourself.
+
+## HTTP interface
+
+If you want to use this with something that's not ruby, there's an experimental sinatra based http interface to the API.
+It's currently pretty basic: Little more than a proof of concept. I may build a service out of it at some point, or if you want to
+take it and run with it I'm fine with that too.
