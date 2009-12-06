@@ -8,10 +8,12 @@ class CachedFeedify
   end
 
   def feed_for_url(url, context=nil)
-    result = memcached.get(url)
-    return result if result
-    result = super.feed_for_url(url, context)
-    memcached.set(url, result, @lifetime)
+    result = @memcached.get(url)    
+    if result
+      return result 
+    end
+    result = super
+    @memcached.set(url, result, @lifetime)
     result
   end
 end
